@@ -33,41 +33,46 @@
     </div>
   </div>
 
-  <script>
-  (() => {
-    const canvas = document.getElementById("game");
-    const ctx = canvas.getContext("2d", { alpha:false });
+ <script>
+(() => {
+  const canvas = document.getElementById("game");
+  const ctx = canvas.getContext("2d", { alpha:false });
 
-    // ===== レイアウトを画面にフィット =====
-    function fitCanvas() {
-      const maxW = Math.min(820, window.innerWidth - 24);
-      const w = Math.max(320, Math.floor(maxW));
-      const h = Math.floor(w * 1.4);
-      canvas.width = w;
-      canvas.height = h;
-      sizes.recalc(w, h);
+  // 画面サイズに合わせてキャンバスを調整
+  function fitCanvas() {
+    const maxW = Math.min(window.innerWidth * 0.9, 640); // 幅の上限を640px
+    const w = Math.floor(maxW);
+    const h = Math.floor(w * 1.2); // 縦横比を少し小さく
+    canvas.width = w * window.devicePixelRatio;
+    canvas.height = h * window.devicePixelRatio;
+    canvas.style.width = w + "px";
+    canvas.style.height = h + "px";
+    ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+    sizes.recalc(w, h);
+  }
+
+  const sizes = {
+    cw: 640, ch: 800,
+    paddleW: 100, paddleH: 10, paddleY: 0,
+    brick: { rows: 5, cols: 8, w: 0, h: 20, pad: 4, top: 60, left: 8 },
+    recalc(w, h){
+      this.cw=w; this.ch=h;
+      this.paddleW = Math.max(50, Math.floor(w*0.15)); // 幅を画面の15%
+      this.paddleH = Math.max(8, Math.floor(h*0.012));
+      this.paddleY = h - Math.floor(h*0.1);
+      this.brick.cols = 8;
+      this.brick.rows = 5;
+      const totalPad = (this.brick.cols+1)*this.brick.pad;
+      this.brick.w = Math.floor((w - totalPad) / this.brick.cols);
+      this.brick.h = Math.max(14, Math.floor(h*0.025));
+      this.brick.left = 8;
+      this.brick.top = Math.floor(h*0.08);
     }
+  };
 
-    const sizes = {
-      cw: 640, ch: 900,
-      paddleW: 100, paddleH: 14, paddleY: 0,
-      brick: { rows: 6, cols: 10, w: 0, h: 24, pad: 4, top: 80, left: 8 },
-      recalc(w,h){
-        this.cw=w; this.ch=h;
-        this.paddleW = Math.max(70, Math.floor(w*0.16));
-        this.paddleH = Math.max(12, Math.floor(h*0.015));
-        this.paddleY = h - Math.floor(h*0.08);
-        const margin = 12;
-        this.brick.cols = 10;
-        this.brick.rows = 6 + (level-1); // レベルで段数UP
-        const totalPad = (this.brick.cols+1)*this.brick.pad + margin*2;
-        this.brick.w = Math.floor((w - totalPad)/this.brick.cols);
-        this.brick.h = Math.max(18, Math.floor(h*0.025));
-        this.brick.left = margin;
-        this.brick.top = Math.floor(h*0.08);
-      }
-    };
-
+  // 残りのコード（update, draw, initなど）は前のままでOK
+  // ここから下は削除せずそのまま残してください。
+})();
     // ===== ゲーム状態 =====
     let score = 0, lives = 3, level = 1, paused = false, running = true;
 
