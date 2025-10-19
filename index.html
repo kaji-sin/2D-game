@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>💨 おならフェラーリレーサーズ</title>
+  <title>💨 おならフェラーリレーサーズ（ボス＆爆発対応）</title>
   <style>
     html, body { height: 100%; margin: 0; background: #0b1020; color: #fff; font-family: system-ui, -apple-system, Segoe UI, Roboto, 'Hiragino Kaku Gothic ProN', Meiryo, sans-serif; }
     #wrap { display: grid; place-items: center; height: 100%; }
@@ -12,13 +12,18 @@
     #stage { position: fixed; top: 8px; right: 12px; font-weight: 700; }
     canvas { background: #87ceeb; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,.3); }
     .btn { position: fixed; left: 50%; transform: translateX(-50%); bottom: 14px; background: #c00; border-radius: 999px; padding: 10px 16px; cursor: pointer; user-select: none; font-weight: 700; display:none; color:#fff; }
+    #banner { position: fixed; left: 50%; transform: translateX(-50%); top: 14px; background: rgba(0,0,0,.6); border-radius: 12px; padding: 8px 14px; font-weight: 800; letter-spacing: .5px; display:none; }
   </style>
 </head>
 <body>
-  <audio id="bgm" preload="auto" loop></audio>
+  <!-- BGM と爆発音（任意）: assets/ に配置すると鳴ります。無くても動作します。 -->
+  <audio id="bgm" src="assets/bgm.mp3" preload="auto" loop></audio>
+  <audio id="se_boom" src="assets/explosion.wav" preload="auto"></audio>
+
   <div id="wrap">
     <canvas id="cv" width="960" height="600"></canvas>
     <div id="restart" class="btn">R でリスタート / クリックでもOK</div>
+    <div id="banner">STAGE CLEAR!</div>
   </div>
   <div id="hud"></div>
   <div id="stage"></div>
@@ -32,41 +37,76 @@
     const hud = document.getElementById('hud');
     const stageEl = document.getElementById('stage');
     const btnRestart = document.getElementById('restart');
+    const banner = document.getElementById('banner');
+
+    const SND = {
+      bgm: document.getElementById('bgm'),
+      boom: document.getElementById('se_boom')
+    };
+    if (SND.bgm) SND.bgm.volume = 0.35;
+    if (SND.boom) SND.boom.volume = 0.5;
+
     const rand = (a,b)=>Math.random()*(b-a)+a;
 
+    // ---- ステージ設定（ゲート到達でボス） ----
     const STAGES = [
-      { name: 'City', bg: '#87ceeb', enemySpeed: 4.5, spawn: 42, gate: 120 },
+      { name: 'City',   bg: '#87ceeb', enemySpeed: 4.5, spawn: 42, gate: 120 },
       { name: 'Desert', bg: '#f4deb3', enemySpeed: 5.8, spawn: 34, gate: 280 },
-      { name: 'Space', bg: '#080820', enemySpeed: 7.2, spawn: 26, gate: 9e9 },
+      { name: 'Space',  bg: '#080820', enemySpeed: 7.2, spawn: 26, gate: 999999 }
     ];
     let stageIndex = 0;
 
+    // ---- 入力 ----
     const keys = {};
-    window.addEventListener('keydown', e => { keys[e.key] = true; });
+    window.addEventListener('keydown', e => { keys[e.key] = true; if (e.key===' ') e.preventDefault(); });
     window.addEventListener('keyup', e => { keys[e.key] = false; });
 
+    // ---- パーティクル（おなら＆爆発） ----
     class Particle {
-      constructor(x,y){
-        this.x=x; this.y=y; this.vx = -rand(2.0,4.2); this.vy = rand(-1.2,1.2);
-        this.life = Math.floor(rand(20,34)); this.size = Math.floor(rand(5,12));
-        const r = Math.floor(rand(200,255)), g = Math.floor(rand(0,60)), b = Math.floor(rand(0,10));
-        this.color = `rgb(${r},${g},${b})`;
+      constructor(x,y,color,lifeMin=20,lifeMax=34,sizeMin=5,sizeMax=12,vxMin=-4.2,vxMax=-2.0,vyMin=-1.2,vyMax=1.2){
+        this.x=x; this.y=y;
+        this.vx = rand(vxMin, vxMax); this.vy = rand(vyMin, vyMax);
+        this.life = Math.floor(rand(lifeMin, lifeMax));
+        this.size = Math.floor(rand(sizeMin, sizeMax));
+        this.color = color;
+        this.alpha = 1;
       }
-      update(){ this.x+=this.vx; this.y+=this.vy; this.life--; return this.life>0; }
-      draw(){ ctx.beginPath(); ctx.fillStyle=this.color; ctx.arc(this.x,this.y,this.size,0,Math.PI*2); ctx.fill(); }
+      update(){ this.x+=this.vx; this.y+=this.vy; this.vx*=0.985; this.vy*=0.985; this.life--; this.alpha = Math.max(0, this.life/30); return this.life>0; }
+      draw(){ ctx.globalAlpha = this.alpha; ctx.beginPath(); ctx.fillStyle=this.color; ctx.arc(this.x,this.y,this.size,0,Math.PI*2); ctx.fill(); ctx.globalAlpha = 1; }
     }
 
+    function fartColor(){
+      const r = Math.floor(rand(200,255)), g = Math.floor(rand(0,60)), b = Math.floor(rand(0,10));
+      return `rgb(${r},${g},${b})`; // 赤系（フェラーリおなら演出）
+    }
+
+    function explosionBurst(x,y){
+      // オレンジ～黄の爆発
+      for(let i=0;i<26;i++){
+        const hue = rand(30,55); // だいたいオレンジ～黄
+        const sat = Math.floor(rand(80,100));
+        const light = Math.floor(rand(50,70));
+        const col = `hsl(${hue} ${sat}% ${light}%)`;
+        const p = new Particle(x,y,col, 14, 28, 3, 9, -5, 5, -5, 5);
+        particles.push(p);
+      }
+      // 爆発音
+      try { SND.boom && (SND.boom.currentTime=0, SND.boom.play()); } catch(_){}
+    }
+
+    // ---- プレイヤー ----
     class Player {
       constructor(){ this.w=90; this.h=40; this.x=80; this.y=H/2; this.boost=0; this.maxBoost=9.2; this.health=5; this.weapon=1; this.shootCd=0; }
       rect(){ return {x:this.x,y:this.y,w:this.w,h:this.h}; }
       update(){
-        if(keys['ArrowUp']){ this.boost+=0.5; for(let i=0;i<2;i++) particles.push(new Particle(this.x-8, this.y+this.h/2)); }
+        if(keys['ArrowUp']){ this.boost+=0.5; for(let i=0;i<2;i++) particles.push(new Particle(this.x-8, this.y+this.h/2, fartColor())); }
         this.boost*=0.94; if(this.boost>this.maxBoost) this.boost=this.maxBoost; this.x+=this.boost;
         if(keys['ArrowLeft']) this.y-=6; if(keys['ArrowRight']) this.y+=6;
         this.x=Math.max(20,Math.min(this.x, W-this.w-20)); this.y=Math.max(20,Math.min(this.y, H-this.h-20));
         if(this.shootCd>0) this.shootCd--; }
       draw(){
         ctx.save(); ctx.translate(this.x,this.y);
+        // フェラーリ風
         ctx.fillStyle = 'red'; ctx.beginPath();
         ctx.moveTo(0,20); ctx.quadraticCurveTo(45,-10,90,15); ctx.quadraticCurveTo(92,40,0,30); ctx.closePath(); ctx.fill();
         ctx.fillStyle = '#fff'; ctx.fillRect(25,10,15,8);
@@ -74,8 +114,9 @@
         ctx.restore(); }
     }
 
+    // ---- 弾／敵 ----
     class Bullet { constructor(x,y,vx=13,vy=0){ this.x=x; this.y=y; this.vx=vx; this.vy=vy; this.r=5; }
-      update(){ this.x+=this.vx; this.y+=this.vy; return this.x<=W; }
+      update(){ this.x+=this.vx; this.y+=this.vy; return this.x<=W && this.y>-20 && this.y<H+20; }
       draw(){ ctx.beginPath(); ctx.fillStyle='#fff'; ctx.arc(this.x,this.y,this.r,0,Math.PI*2); ctx.fill(); }
     }
 
@@ -85,29 +126,148 @@
       draw(){ ctx.fillStyle='gray'; ctx.fillRect(this.x,this.y,this.w,this.h); }
     }
 
+    // ---- ボス ----
+    class Boss {
+      constructor(){
+        this.w=200; this.h=120; this.x=W+40; this.y=H/2 - this.h/2; this.vx= -2.2; this.vy= 1.2; this.hpMax=60; this.hp=this.hpMax; this.active=true; this.entered=false;
+      }
+      rect(){ return {x:this.x,y:this.y,w:this.w,h:this.h}; }
+      update(){
+        // 入場: 画面右外から中央付近へ
+        if(!this.entered){ this.x += this.vx; if(this.x < W - this.w - 80){ this.entered = true; } }
+        else {
+          // 上下にゆっくり揺れる
+          this.y += this.vy; if(this.y<40 || this.y>H-this.h-40) this.vy*=-1;
+        }
+        return this.active;
+      }
+      draw(){
+        ctx.save(); ctx.translate(this.x,this.y);
+        // ボス機体（ダークレッド）
+        ctx.fillStyle = '#5c0b12'; ctx.fillRect(0, 20, this.w, this.h-40);
+        ctx.fillStyle = '#a11224'; ctx.fillRect(20, 0, this.w-40, this.h);
+        ctx.fillStyle = '#1a1a1a'; ctx.fillRect(10, this.h-18, this.w-20, 14);
+        ctx.restore();
+        // HPバー
+        const barW = 360, barH = 16, bx = W/2 - barW/2, by = 14;
+        ctx.fillStyle = 'rgba(0,0,0,.35)'; ctx.fillRect(bx-2, by-2, barW+4, barH+4);
+        ctx.fillStyle = '#333'; ctx.fillRect(bx, by, barW, barH);
+        const ratio = Math.max(0, this.hp/this.hpMax);
+        ctx.fillStyle = '#ef3d2e'; ctx.fillRect(bx, by, barW*ratio, barH);
+        ctx.strokeStyle = '#000'; ctx.strokeRect(bx, by, barW, barH);
+      }
+    }
+
     function collide(a,b){ return a.x<b.x+b.w && a.x+a.w>b.x && a.y<b.y+b.h && a.y+a.h>b.y; }
     function collideCircleRect(cx,cy,cr, r){ const nx=Math.max(r.x,Math.min(cx,r.x+r.w)); const ny=Math.max(r.y,Math.min(cy,r.y+r.h)); const dx=cx-nx, dy=cy-ny; return dx*dx+dy*dy <= cr*cr; }
 
+    // ---- ゲーム状態 ----
     let player, bullets, enemies, particles, score, spawnT, running=true, gameOver=false;
-    function reset(){ player=new Player(); bullets=[]; enemies=[]; particles=[]; score=0; spawnT=0; stageIndex=0; gameOver=false; running=true; }
+    let boss = null;      // ボス未出現時は null
+    let bossTime = 0;     // 演出用
+    let clearTimer = 0;   // ステージクリア演出
+
+    function reset(){
+      player=new Player(); bullets=[]; enemies=[]; particles=[]; score=0; spawnT=0; stageIndex=0; gameOver=false; running=true; boss=null; bossTime=0; clearTimer=0;
+      try { SND.bgm && (SND.bgm.currentTime=0, SND.bgm.play()); } catch(_){}
+      banner.style.display='none';
+    }
     reset();
 
     function tryShoot(){ if(player.shootCd>0) return; const px=player.x+player.w, py=player.y+player.h/2; bullets.push(new Bullet(px,py)); player.shootCd=8; }
 
-    let last=0; function loop(t){ last=t; if(!running){ requestAnimationFrame(loop); return; }
+    // ---- ループ ----
+    function loop(){ if(!running){ requestAnimationFrame(loop); return; }
       const st=STAGES[stageIndex]; cv.style.background=st.bg;
 
-      if(!gameOver){ if(keys[' ']) tryShoot(); player.update(); bullets=bullets.filter(b=>b.update()); spawnT++; if(spawnT>st.spawn){ enemies.push(new Enemy(st.enemySpeed)); spawnT=0; }
-        enemies=enemies.filter(e=>e.update(player.y)); particles=particles.filter(p=>p.update()); bullets=bullets.filter(b=>{ let hit=false; for(let i=0;i<enemies.length;i++){ if(collideCircleRect(b.x,b.y,b.r,enemies[i].rect())){ enemies[i].hp--; hit=true; if(enemies[i].hp<=0){ score+=10; enemies.splice(i,1); } break;} } return !hit; }); const pr=player.rect(); for(let i=enemies.length-1;i>=0;i--){ if(collide(pr,enemies[i].rect())){ enemies.splice(i,1); player.health--; if(player.health<=0){ gameOver=true; running=false; btnRestart.style.display='block'; } } } }
+      // ステージ進行：ゲート到達でボスを出す（1回だけ）
+      if(!boss && score >= st.gate && stageIndex < STAGES.length){
+        boss = new Boss();
+      }
 
-      ctx.clearRect(0,0,W,H); particles.forEach(p=>p.draw()); enemies.forEach(e=>e.draw()); bullets.forEach(b=>b.draw()); player.draw();
-      hud.innerHTML=`Score: ${score}<br>HP: ${player.health}<br>Car: Ferrari`;
-      stageEl.textContent=`Stage: ${STAGES[stageIndex].name}`;
-      requestAnimationFrame(loop); }
+      if(!gameOver){
+        if(keys[' '] || keys['Spacebar']) tryShoot();
+        player.update();
+
+        // 雑魚はボス出現中は出さない
+        if(!boss){
+          spawnT++; if(spawnT>st.spawn){ enemies.push(new Enemy(st.enemySpeed)); spawnT=0; }
+        }
+
+        // 更新
+        bullets = bullets.filter(b=>b.update());
+        enemies = enemies.filter(e=>e.update(player.y));
+        particles = particles.filter(p=>p.update());
+
+        if(boss){ boss.update(); }
+
+        // 当たり判定（弾→敵）
+        bullets = bullets.filter(b=>{
+          // ボス判定を先に
+          if(boss && boss.active && collideCircleRect(b.x,b.y,b.r, boss.rect())){
+            boss.hp -= 1; explosionBurst(b.x,b.y); // ヒット時に小爆発
+            return false; // 弾消滅
+          }
+          let hit=false; for(let i=0;i<enemies.length;i++){
+            if(collideCircleRect(b.x,b.y,b.r, enemies[i].rect())){
+              enemies[i].hp--; explosionBurst(b.x,b.y); // 雑魚にも爆発
+              hit=true; if(enemies[i].hp<=0){ score+=10; enemies.splice(i,1); }
+              break;
+            }
+          }
+          return !hit;
+        });
+
+        // ボス撃破
+        if(boss && boss.hp<=0 && boss.active){
+          boss.active=false; explosionBurst(boss.x+boss.w/2, boss.y+boss.h/2); // 大爆発
+          // ステージクリア演出 → 次ステージへ
+          clearTimer = 180; // 約3秒
+          banner.textContent = 'STAGE CLEAR!';
+          banner.style.display='block';
+        }
+
+        // クリア演出中のカウントと遷移
+        if(clearTimer>0){
+          clearTimer--; if(clearTimer===0){
+            banner.style.display='none'; boss=null; // 次ステージへ
+            if(stageIndex < STAGES.length-1){ stageIndex++; } // 最終面は据え置き
+          }
+        }
+
+        // プレイヤー vs 敵
+        const pr = player.rect();
+        for(let i=enemies.length-1;i>=0;i--){ if(collide(pr,enemies[i].rect())){ explosionBurst(enemies[i].x+enemies[i].w/2, enemies[i].y+enemies[i].h/2); enemies.splice(i,1); player.health--; if(player.health<=0){ gameOver=true; running=false; btnRestart.style.display='block'; } } }
+
+        // プレイヤー vs ボス（体当たり）
+        if(boss && boss.active && collide(pr, boss.rect())){
+          explosionBurst(player.x+player.w/2, player.y+player.h/2);
+          player.health--; if(player.health<=0){ gameOver=true; running=false; btnRestart.style.display='block'; }
+        }
+      }
+
+      // ---- 描画 ----
+      ctx.clearRect(0,0,W,H);
+      particles.forEach(p=>p.draw());
+      enemies.forEach(e=>e.draw());
+      if(boss && (boss.active || !boss.entered)) boss.draw();
+      bullets.forEach(b=>b.draw());
+      player.draw();
+
+      // HUD
+      stageEl.textContent = boss && boss.active ? `Stage: ${STAGES[stageIndex].name}  /  BOSS!` : `Stage: ${STAGES[stageIndex].name}`;
+      hud.innerHTML = `Score: ${score}<br>HP: ${player.health}<br>Car: Ferrari`;
+
+      requestAnimationFrame(loop);
+    }
     requestAnimationFrame(loop);
 
+    // ---- 再スタート・一時停止 ----
     btnRestart.addEventListener('click',()=>{ btnRestart.style.display='none'; running=true; reset(); });
-    window.addEventListener('keydown', e=>{ if(e.key==='r'||e.key==='R'){ btnRestart.style.display='none'; running=true; reset(); } });
+    window.addEventListener('keydown', e=>{
+      if(e.key==='r'||e.key==='R'){ btnRestart.style.display='none'; running=true; reset(); }
+      if(e.key==='Escape'){ running = !running; if(running){ requestAnimationFrame(loop); } }
+    });
   })();
   </script>
 </body>
