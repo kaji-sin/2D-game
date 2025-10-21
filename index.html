@@ -2,344 +2,230 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>100マスそろばんゲーム</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>テトリス風ゲーム</title>
   <style>
-    :root{--bg:#0f172a;--panel:#111827;--muted:#94a3b8;--text:#e5e7eb;--accent:#22c55e;--warn:#ef4444;--grid:#1f2937;--cell:#0b1220;--btn:#1d4ed8}
-    *{box-sizing:border-box}
-    body{margin:0;background:linear-gradient(180deg,#0b1020,#0b1328);color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,"Apple Color Emoji","Segoe UI Emoji"}
-    header{display:flex;gap:12px;align-items:center;justify-content:space-between;padding:16px 20px;background:#0b1220;position:sticky;top:0;z-index:5;border-bottom:1px solid #1e293b}
-    header h1{margin:0;font-size:18px;letter-spacing:.5px}
-    .controls{display:flex;gap:10px;flex-wrap:wrap}
-    select,button,input[type="number"],.pill{background:#0f172a;color:var(--text);border:1px solid #23314a;border-radius:10px;padding:8px 10px}
-    button{cursor:pointer}
-    button.primary{background:var(--btn);border-color:#1e40af}
-    button.ghost{background:#0f172a}
-    .wrap{display:grid;grid-template-columns: 1fr 350px;gap:16px;padding:16px}
-    @media (max-width: 1080px){.wrap{grid-template-columns:1fr}}
-
-    /* Grid */
-    .grid-wrap{background:#0b1220;border:1px solid #1f2b44;border-radius:14px;padding:12px}
-    .grid{display:grid;grid-template-columns:repeat(11, 1fr);border:1px solid var(--grid);border-radius:10px;overflow:hidden}
-    .cell{border:1px solid var(--grid);min-height:48px;display:flex;align-items:center;justify-content:center;background:var(--cell)}
-    .cell.header{background:#0f172a;font-weight:700}
-    .cell.input{padding:0}
-    .cell input{width:100%;height:100%;border:0;background:transparent;color:var(--text);text-align:center;font-size:16px;padding:6px}
-    .cell.correct{background:rgba(34,197,94,.14)}
-    .cell.wrong{background:rgba(239,68,68,.12)}
-
-    .stats{display:flex;gap:12px;margin:8px 4px 0;flex-wrap:wrap;color:var(--muted)}
-    .stats b{color:var(--text)}
-
-    /* Side Panel */
-    .panel{background:#0b1220;border:1px solid #1f2b44;border-radius:14px;padding:14px;position:sticky;top:72px}
-    .panel h3{margin:0 0 8px;font-size:16px}
-    .panel .sub{color:var(--muted);font-size:12px;margin-bottom:10px}
-    .row{display:flex;gap:8px;align-items:center;margin:8px 0}
-
-    /* Soroban */
-    .soro{display:flex;gap:10px;justify-content:center;margin-top:8px}
-    .digit{display:flex;flex-direction:column;align-items:center;padding:6px 8px;border:1px dashed #24324d;border-radius:10px}
-    .beam{width:40px;height:4px;background:#334155;border-radius:2px;margin:8px 0}
-    .upper, .lower{display:flex;flex-direction:column;gap:6px;align-items:center}
-    .bead{width:32px;height:18px;border-radius:999px;background:#1e293b;border:1px solid #2f3f5f;display:flex;align-items:center;justify-content:center;cursor:pointer;user-select:none;transition:.1s}
-    .bead.active{background:#22c55e33;border-color:#22c55e}
-    .digit-label{font-size:12px;color:#9aa7bd;margin-top:6px}
-    .value{margin-top:8px;text-align:center}
-
-    .help{font-size:12px;color:#8aa0c6;margin-top:4px}
-    .kbd{border:1px solid #2a3958;border-radius:6px;padding:2px 6px;margin:0 2px;color:#cbd5e1}
-
-    .footer-note{opacity:.7;font-size:11px;margin-top:6px}
+    body {
+      background: #111;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      color: white;
+      font-family: sans-serif;
+    }
+    canvas {
+      border: 2px solid #555;
+      background: #000;
+    }
   </style>
 </head>
 <body>
-  <header>
-    <h1>100マスそろばんゲーム</h1>
-    <div class="controls">
-      <label>種類
-        <select id="mode">
-          <option value="add">足し算</option>
-          <option value="mul">かけ算</option>
-        </select>
-      </label>
-      <label>最大数（1〜10）
-        <input id="maxN" type="number" min="5" max="10" value="9" />
-      </label>
-      <button class="primary" id="newGame">新しい表を作る</button>
-      <button class="ghost" id="checkAll">一括採点</button>
-      <button class="ghost" id="clearWrong">間違いだけ消す</button>
-      <span class="pill" id="timer">00:00</span>
-    </div>
-  </header>
-
-  <div class="wrap">
-    <section class="grid-wrap">
-      <div class="grid" id="grid"></div>
-      <div class="stats">
-        <div>正解: <b id="ok">0</b> / <span id="total">0</span></div>
-        <div>正答率: <b id="rate">0%</b></div>
-        <div>ベストタイム: <b id="best">—</b></div>
-      </div>
-    </section>
-
-    <aside class="panel">
-      <h3>そろばん入力</h3>
-      <div class="sub">選択中のマスに、そろばんで答えを入れられます（2桁まで想定）。数字直接入力もOK。</div>
-      <div class="row">現在の答え：<input id="numInput" type="number" min="0" max="99" value="0" style="width:90px"/></div>
-      <div class="soro" id="soroban"></div>
-      <div class="value">そろばんの値：<b id="soroVal">0</b></div>
-      <div class="row">
-        <button class="primary" id="apply">この数をマスへ</button>
-        <button id="resetBeads">クリア</button>
-      </div>
-      <div class="help">操作ヒント：
-        <span class="kbd">↑↓</span>で桁移動、
-        <span class="kbd">←→</span>で値変更、
-        <span class="kbd">Enter</span>で確定
-      </div>
-      <div class="footer-note">※ 本ゲームは学習向けの簡易そろばん表現です。実物と配置が異なる簡略版です。</div>
-    </aside>
-  </div>
-
+  <canvas id="game" width="240" height="400"></canvas>
   <script>
-    // ======= Core State =======
-    const gridEl = document.getElementById('grid');
-    const okEl = document.getElementById('ok');
-    const totalEl = document.getElementById('total');
-    const rateEl = document.getElementById('rate');
-    const timerEl = document.getElementById('timer');
-    const bestEl = document.getElementById('best');
-    const modeSel = document.getElementById('mode');
-    const maxNInput = document.getElementById('maxN');
-    const newBtn = document.getElementById('newGame');
-    const checkBtn = document.getElementById('checkAll');
-    const clearWrongBtn = document.getElementById('clearWrong');
+    const canvas = document.getElementById('game');
+    const context = canvas.getContext('2d');
+    context.scale(20, 20);
 
-    const numInput = document.getElementById('numInput');
-    const soroWrap = document.getElementById('soroban');
-    const soroVal = document.getElementById('soroVal');
-    const applyBtn = document.getElementById('apply');
-    const resetBeadsBtn = document.getElementById('resetBeads');
+    const colors = [
+      null,
+      '#ff0d72',
+      '#0dc2ff',
+      '#0dff72',
+      '#f538ff',
+      '#ff8e0d',
+      '#ffe138',
+      '#3877ff',
+    ];
 
-    let headersTop = []; // 1..N
-    let headersLeft = []; // 1..N
-    let answers = []; // NxN
-    let inputs = []; // NxN
-    let N = 10;
-    let startedAt = null; let timerH = null; let best = localStorage.getItem('soro100_best');
-    if(best) bestEl.textContent = best + ' 秒';
-
-    function pad(n){return String(n).padStart(2,'0')}
-    function startTimer(){
-      startedAt = Date.now();
-      clearInterval(timerH);
-      timerH = setInterval(()=>{
-        const s = Math.floor((Date.now()-startedAt)/1000);
-        timerEl.textContent = `${pad(Math.floor(s/60))}:${pad(s%60)}`;
-      },200);
-    }
-    function stopTimer(){ clearInterval(timerH); }
-
-    function buildGrid(){
-      gridEl.innerHTML = '';
-      gridEl.style.gridTemplateColumns = `repeat(${N+1}, 1fr)`;
-      // First cell blank
-      const topLeft = document.createElement('div');
-      topLeft.className = 'cell header';
-      topLeft.textContent = modeSel.value === 'add' ? '＋' : '×';
-      gridEl.appendChild(topLeft);
-      // Top headers
-      headersTop.forEach(v=>{
-        const d=document.createElement('div');d.className='cell header';d.textContent=v;gridEl.appendChild(d);
-      });
-      // Rows
-      for(let r=0;r<N;r++){
-        // Left header
-        const lh=document.createElement('div');lh.className='cell header';lh.textContent=headersLeft[r];gridEl.appendChild(lh);
-        for(let c=0;c<N;c++){
-          const cell=document.createElement('div');cell.className='cell input';
-          const inp=document.createElement('input');
-          inp.inputMode='numeric';
-          inp.autocomplete='off';
-          inp.setAttribute('data-r',r);inp.setAttribute('data-c',c);
-          inp.addEventListener('focus',()=> selectCell(r,c, inp));
-          inp.addEventListener('input',()=> { inputs[r][c]=inp.value; gradeCell(r,c,cell); updateStats(); });
-          inp.addEventListener('keydown', (e)=> handleCellKeys(e,r,c,inp));
-          cell.appendChild(inp);
-          gridEl.appendChild(cell);
-        }
-      }
-      totalEl.textContent = String(N*N);
-      updateStats();
-    }
-
-    function handleCellKeys(e,r,c,inp){
-      const key=e.key;
-      if(key==='Enter'){ // jump next
-        applyNumberFromSoroban();
-        const nc = (c+1)%N; const nr = nc===0? (r+1)%N : r;
-        const next = document.querySelector(`input[data-r="${nr}"][data-c="${nc}"]`);
-        if(next) next.focus();
-      }
-      if(key==='ArrowLeft' || key==='ArrowRight' || key==='ArrowUp' || key==='ArrowDown'){
-        // route to soroban controls
-        soroKeyControl(key);
-        e.preventDefault();
-      }
-    }
-
-    function newTable(){
-      const maxN = Math.max(5, Math.min(10, parseInt(maxNInput.value||'9',10)));
-      N = 10; // 100マス固定
-      headersTop = Array.from({length:N}, (_,i)=> 1 + Math.floor(Math.random()*maxN));
-      headersLeft = Array.from({length:N}, (_,i)=> 1 + Math.floor(Math.random()*maxN));
-      answers = Array.from({length:N},(_,r)=> Array.from({length:N},(_,c)=> modeSel.value==='add' ? headersTop[c]+headersLeft[r] : headersTop[c]*headersLeft[r]));
-      inputs  = Array.from({length:N},()=> Array.from({length:N},()=>''));
-      buildGrid();
-      startTimer();
-    }
-
-    function gradeCell(r,c,cellEl){
-      const correct = String(answers[r][c]);
-      const val = String(inputs[r][c]||'');
-      cellEl.classList.remove('correct','wrong');
-      if(!val) return;
-      if(val===correct){ cellEl.classList.add('correct'); }
-      else { cellEl.classList.add('wrong'); }
-    }
-
-    function updateStats(){
-      let ok=0, filled=0;
-      for(let r=0;r<N;r++) for(let c=0;c<N;c++){ const v=inputs[r][c]; if(v!=='' ){ filled++; if(String(v)===String(answers[r][c])) ok++; }
-      }
-      okEl.textContent = ok;
-      const rate = (ok/(N*N))*100; rateEl.textContent = rate.toFixed(0)+"%";
-      if(ok===N*N){
-        stopTimer();
-        const secs = Math.floor((Date.now()-startedAt)/1000);
-        if(!best || secs < parseInt(best,10)){ best = String(secs); localStorage.setItem('soro100_best', best); bestEl.textContent = best + ' 秒'; }
-      }
-    }
-
-    checkBtn.addEventListener('click',()=>{
-      document.querySelectorAll('.cell.input').forEach((cell,i)=>{
-        const r = Math.floor(i/N); const c = i%N;
-        gradeCell(r,c,cell);
-      });
-      updateStats();
-    });
-
-    clearWrongBtn.addEventListener('click',()=>{
-      document.querySelectorAll('.cell.input').forEach((cell,i)=>{
-        if(cell.classList.contains('wrong')){
-          const r = Math.floor(i/N); const c=i%N;
-          inputs[r][c]=''; cell.querySelector('input').value=''; cell.classList.remove('wrong');
-        }
-      });
-      updateStats();
-    });
-
-    newBtn.addEventListener('click', newTable);
-
-    // ======= Soroban (simplified) =======
-    // Two digits: tens (index 1) and ones (index 0). Provide optional hundreds automatically if needed
-    let digits = 2; // default 2 digits
-    const soro = { // per-digit state: {upper:0|1, lower:0..4}
-      0:{upper:0,lower:0},
-      1:{upper:0,lower:0},
-      2:{upper:0,lower:0}, // hidden unless needed
+    const arena = createMatrix(12, 20);
+    const player = {
+      pos: {x: 0, y: 0},
+      matrix: null,
+      score: 0,
     };
 
-    function renderSoroban(){
-      // decide digits based on possible max
-      const maxVal = modeSel.value==='mul' ? 100 : 20; // upper bound
-      digits = maxVal>=100?3: (maxVal>=10?2:1);
-      soroWrap.innerHTML='';
-      for(let d=digits-1; d>=0; d--){ // hundreds ... ones (left to right visually)
-        const col = document.createElement('div'); col.className='digit'; col.setAttribute('data-digit', d);
-        const upper = document.createElement('div'); upper.className='upper';
-        const upperBead = document.createElement('div'); upperBead.className='bead'; upperBead.textContent='5'; if(soro[d].upper) upperBead.classList.add('active');
-        upperBead.addEventListener('click',()=>{ soro[d].upper = soro[d].upper?0:1; syncNumberFromBeads(); renderSoroban(); });
-        upper.appendChild(upperBead);
-        const beam = document.createElement('div'); beam.className='beam';
-        const lower = document.createElement('div'); lower.className='lower';
-        for(let i=0;i<4;i++){
-          const lb = document.createElement('div'); lb.className='bead'; lb.textContent='1';
-          if(i < soro[d].lower) lb.classList.add('active');
-          lb.addEventListener('click',()=>{ soro[d].lower = (i+1===soro[d].lower)? i : (i+1); if(soro[d].lower>4) soro[d].lower=4; syncNumberFromBeads(); renderSoroban(); });
-          lower.appendChild(lb);
-        }
-        const label=document.createElement('div'); label.className='digit-label'; label.textContent = d===2?'百の位':(d===1?'十の位':'一の位');
-        col.appendChild(upper); col.appendChild(beam); col.appendChild(lower); col.appendChild(label);
-        soroWrap.appendChild(col);
+    function createMatrix(w, h) {
+      const matrix = [];
+      while (h--) {
+        matrix.push(new Array(w).fill(0));
       }
-      soroVal.textContent = String(currentBeadsValue());
+      return matrix;
     }
 
-    function currentBeadsValue(){
-      let v=0; for(let d=0; d<digits; d++){ const mul=Math.pow(10,d); v += (soro[d].upper?5:0 + soro[d].lower) * mul; } return v;
+    function createPiece(type) {
+      if (type === 'T') {
+        return [
+          [0, 0, 0],
+          [1, 1, 1],
+          [0, 1, 0],
+        ];
+      } else if (type === 'O') {
+        return [
+          [2, 2],
+          [2, 2],
+        ];
+      } else if (type === 'L') {
+        return [
+          [0, 3, 0],
+          [0, 3, 0],
+          [0, 3, 3],
+        ];
+      } else if (type === 'J') {
+        return [
+          [0, 4, 0],
+          [0, 4, 0],
+          [4, 4, 0],
+        ];
+      } else if (type === 'I') {
+        return [
+          [0, 5, 0, 0],
+          [0, 5, 0, 0],
+          [0, 5, 0, 0],
+          [0, 5, 0, 0],
+        ];
+      } else if (type === 'S') {
+        return [
+          [0, 6, 6],
+          [6, 6, 0],
+          [0, 0, 0],
+        ];
+      } else if (type === 'Z') {
+        return [
+          [7, 7, 0],
+          [0, 7, 7],
+          [0, 0, 0],
+        ];
+      }
     }
 
-    function syncNumberFromBeads(){
-      const v=currentBeadsValue();
-      numInput.value = v;
-      soroVal.textContent = String(v);
+    function collide(arena, player) {
+      const [m, o] = [player.matrix, player.pos];
+      for (let y = 0; y < m.length; ++y) {
+        for (let x = 0; x < m[y].length; ++x) {
+          if (m[y][x] !== 0 &&
+              (arena[y + o.y] &&
+               arena[y + o.y][x + o.x]) !== 0) {
+            return true;
+          }
+        }
+      }
+      return false;
     }
 
-    function setBeadsFromNumber(n){
-      n = Math.max(0, Math.min(n, 999));
-      for(let d=0; d<3; d++){ const digitVal = Math.floor(n/Math.pow(10,d))%10; soro[d].upper = digitVal>=5?1:0; soro[d].lower = digitVal>=5? digitVal-5 : digitVal; }
-      renderSoroban();
+    function merge(arena, player) {
+      player.matrix.forEach((row, y) => {
+        row.forEach((value, x) => {
+          if (value !== 0) {
+            arena[y + player.pos.y][x + player.pos.x] = value;
+          }
+        });
+      });
     }
 
-    numInput.addEventListener('input', ()=>{
-      const v = parseInt(numInput.value||'0',10); setBeadsFromNumber(isNaN(v)?0:v);
+    function rotate(matrix, dir) {
+      for (let y = 0; y < matrix.length; ++y) {
+        for (let x = 0; x < y; ++x) {
+          [matrix[x][y], matrix[y][x]] = [matrix[y][x], matrix[x][y]];
+        }
+      }
+      if (dir > 0) {
+        matrix.forEach(row => row.reverse());
+      } else {
+        matrix.reverse();
+      }
+    }
+
+    function playerDrop() {
+      player.pos.y++;
+      if (collide(arena, player)) {
+        player.pos.y--;
+        merge(arena, player);
+        playerReset();
+        arenaSweep();
+      }
+      dropCounter = 0;
+    }
+
+    function playerMove(dir) {
+      player.pos.x += dir;
+      if (collide(arena, player)) {
+        player.pos.x -= dir;
+      }
+    }
+
+    function playerReset() {
+      const pieces = 'TJLOSZI';
+      player.matrix = createPiece(pieces[Math.floor(Math.random() * pieces.length)]);
+      player.pos.y = 0;
+      player.pos.x = (arena[0].length / 2 | 0) - (player.matrix[0].length / 2 | 0);
+      if (collide(arena, player)) {
+        arena.forEach(row => row.fill(0));
+        player.score = 0;
+      }
+    }
+
+    function arenaSweep() {
+      outer: for (let y = arena.length - 1; y >= 0; --y) {
+        for (let x = 0; x < arena[y].length; ++x) {
+          if (arena[y][x] === 0) {
+            continue outer;
+          }
+        }
+        const row = arena.splice(y, 1)[0].fill(0);
+        arena.unshift(row);
+      }
+    }
+
+    function drawMatrix(matrix, offset) {
+      matrix.forEach((row, y) => {
+        row.forEach((value, x) => {
+          if (value !== 0) {
+            context.fillStyle = colors[value];
+            context.fillRect(x + offset.x, y + offset.y, 1, 1);
+          }
+        });
+      });
+    }
+
+    function draw() {
+      context.fillStyle = '#000';
+      context.fillRect(0, 0, canvas.width, canvas.height);
+      drawMatrix(arena, {x: 0, y: 0});
+      drawMatrix(player.matrix, player.pos);
+    }
+
+    let dropCounter = 0;
+    let dropInterval = 1000;
+
+    let lastTime = 0;
+    function update(time = 0) {
+      const deltaTime = time - lastTime;
+      lastTime = time;
+      dropCounter += deltaTime;
+      if (dropCounter > dropInterval) {
+        playerDrop();
+      }
+      draw();
+      requestAnimationFrame(update);
+    }
+
+    document.addEventListener('keydown', event => {
+      if (event.key === 'ArrowLeft') {
+        playerMove(-1);
+      } else if (event.key === 'ArrowRight') {
+        playerMove(1);
+      } else if (event.key === 'ArrowDown') {
+        playerDrop();
+      } else if (event.key === 'q') {
+        rotate(player.matrix, -1);
+      } else if (event.key === 'w') {
+        rotate(player.matrix, 1);
+      }
     });
 
-    function applyNumberFromSoroban(){
-      if(!activeCell){return}
-      const v = currentBeadsValue();
-      activeCell.input.value = v;
-      inputs[activeCell.r][activeCell.c] = String(v);
-      gradeCell(activeCell.r, activeCell.c, activeCell.cellEl);
-      updateStats();
-    }
-
-    resetBeadsBtn.addEventListener('click',()=>{ setBeadsFromNumber(0); });
-    applyBtn.addEventListener('click', applyNumberFromSoroban);
-
-    // Keyboard shortcuts routed from active input
-    function soroKeyControl(key){
-      // select digit by ArrowUp/Down; change by ArrowLeft/Right
-      if(soroFocusDigit==null) soroFocusDigit = 0; // ones
-      if(key==='ArrowUp'){ soroFocusDigit = Math.min(digits-1, soroFocusDigit+1); highlightDigit(); }
-      if(key==='ArrowDown'){ soroFocusDigit = Math.max(0, soroFocusDigit-1); highlightDigit(); }
-      if(key==='ArrowRight'){ const cur = (soro[soroFocusDigit].upper?5:0) + soro[soroFocusDigit].lower; const next=(cur+1)%10; soro[soroFocusDigit].upper = next>=5?1:0; soro[soroFocusDigit].lower = next>=5?next-5:next; syncNumberFromBeads(); renderSoroban(); highlightDigit(); }
-      if(key==='ArrowLeft'){ const cur = (soro[soroFocusDigit].upper?5:0) + soro[soroFocusDigit].lower; const next=(cur+9)%10; soro[soroFocusDigit].upper = next>=5?1:0; soro[soroFocusDigit].lower = next>=5?next-5:next; syncNumberFromBeads(); renderSoroban(); highlightDigit(); }
-    }
-    let soroFocusDigit = 0;
-    function highlightDigit(){
-      document.querySelectorAll('.digit').forEach(d=> d.style.outline='none');
-      const target = document.querySelector(`.digit[data-digit="${soroFocusDigit}"]`);
-      if(target){ target.style.outline='2px solid #3b82f6'; target.style.outlineOffset='2px'; }
-    }
-
-    // Active cell management
-    let activeCell = null; // {r,c, input, cellEl}
-    function selectCell(r,c, inputEl){
-      const idx = r*N + c; const cellEl = inputEl.parentElement;
-      document.querySelectorAll('.cell.input').forEach(el=> el.style.boxShadow='none');
-      cellEl.style.boxShadow='0 0 0 2px #224e96 inset';
-      activeCell = {r, c, input: inputEl, cellEl};
-      // preset soroban with current or 0
-      const v = parseInt(inputEl.value||'0',10); setBeadsFromNumber(isNaN(v)?0:v);
-      soroFocusDigit = 0; highlightDigit();
-    }
-
-    // Initialize
-    newTable();
-    renderSoroban();
+    playerReset();
+    update();
   </script>
 </body>
 </html>
